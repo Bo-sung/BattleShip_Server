@@ -8,8 +8,8 @@ namespace BattleShip.Common.Session
 {// Session/PacketSession.cs
     public abstract class PacketSession
     {
-        private TcpClient _client;
-        private NetworkStream _stream;
+        protected TcpClient _client;
+        protected NetworkStream _stream;
         private readonly RecvBuffer _recvBuffer = new RecvBuffer();
 
         public bool IsConnected => _client?.Connected ?? false;
@@ -31,7 +31,7 @@ namespace BattleShip.Common.Session
                     if (_recvBuffer.FreeSize == 0)
                         _recvBuffer.Compact();
 
-                    int received = await _stream.ReadAsync(_recvBuffer.WriteSpan);
+                    int received = await _stream.ReadAsync(_recvBuffer.WriteMemory);
 
                     // 0바이트 = 연결 종료
                     if (received == 0)

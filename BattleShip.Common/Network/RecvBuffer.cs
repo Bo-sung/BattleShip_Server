@@ -21,7 +21,7 @@ namespace BattleShip.Common.Network
         public int FreeSize => _buffer.Length - _writePos;
 
         // 소켓 수신 데이터를 여기에 씀
-        public Memory<byte> WriteSpan => _buffer.AsMemory(_writePos);
+        public Memory<byte> WriteMemory => _buffer.AsMemory(_writePos);
 
         public void OnWritten(int numBytes)
         {

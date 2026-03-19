@@ -9,7 +9,7 @@ class Program
     {
         Console.OutputEncoding = System.Text.Encoding.UTF8;
         string dbConnection = Environment.GetEnvironmentVariable("DB_CONNECTION")
-                              ?? "Server=localhost;Database=battleship;User=root;Password=1234;";
+                              ?? "Server=localhost;Database=battleship;User=root;Password=asdf1358;";
         string redisConnection = Environment.GetEnvironmentVariable("REDIS_CONNECTION")
                               ?? "localhost:6379";
 

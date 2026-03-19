@@ -3,4 +3,5 @@
   <Project Path="BattleShip.Common/BattleShip.Common.csproj" />
   <Project Path="BattleShip.GameSession/BattleShip.GameSession.csproj" />
   <Project Path="BattleShip.LobbyServer/BattleShip.LobbyServer.csproj" />
+  <Project Path="BattleShip.TestClient/BattleShip.TestClient.csproj" />
 </Solution>

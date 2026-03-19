@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="BattleShip.AuthServer/BattleShip.AuthServer.csproj" />
+  <Project Path="BattleShip.Common/BattleShip.Common.csproj" />
+  <Project Path="BattleShip.GameSession/BattleShip.GameSession.csproj" />
+  <Project Path="BattleShip.LobbyServer/BattleShip.LobbyServer.csproj" />
+</Solution>

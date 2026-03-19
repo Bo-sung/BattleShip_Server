@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet new:*)",
+      "Bash(dotnet sln:*)",
+      "Bash(dotnet add:*)",
+      "Bash(mkdir -p Packets/Auth Packets/Lobby Packets/Game Packets/ServerInternal Network Session)",
+      "Bash(rm -f Class1.cs)",
+      "Bash(mkdir -p Sessions Handlers Services)",
+      "Bash(rm -f appsettings.json appsettings.Development.json)",
+      "Bash(mkdir -p Sessions Handlers Services Repositories)",
+      "Bash(mkdir -p Sessions Handlers Game)",
+      "Bash(dotnet build:*)",
+      "Bash(ls:*)"
+    ]
+  }
+}

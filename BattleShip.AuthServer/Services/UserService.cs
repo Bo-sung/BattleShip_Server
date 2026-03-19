@@ -1,4 +1,4 @@
-namespace BattleShip.AuthServer.Services
+﻿namespace BattleShip.AuthServer.Services
 {
     public class UserService
     {

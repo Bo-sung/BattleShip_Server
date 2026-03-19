@@ -1,6 +1,23 @@
-var builder = WebApplication.CreateBuilder(args);
-var app = builder.Build();
+﻿// BattleShip.AuthServer/Program.cs
+using BattleShip.AuthServer;
+using BattleShip.AuthServer.Services;
+using StackExchange.Redis;
 
-app.MapGet("/", () => "Hello World!");
+class Program
+{
+    static async Task Main(string[] args)
+    {
+        Console.OutputEncoding = System.Text.Encoding.UTF8;
+        string dbConnection = Environment.GetEnvironmentVariable("DB_CONNECTION")
+                              ?? "Server=localhost;Database=battleship;User=root;Password=1234;";
+        string redisConnection = Environment.GetEnvironmentVariable("REDIS_CONNECTION")
+                              ?? "localhost:6379";
 
-app.Run();
+        var redis = await ConnectionMultiplexer.ConnectAsync(redisConnection);
+        var userRepo = new UserRepository(dbConnection);
+        var tokenSvc = new TokenService(redis.GetDatabase());
+
+        var server = new AuthServer(userRepo, tokenSvc);
+        await server.StartAsync(port: 7001);
+    }
+}

@@ -5,7 +5,7 @@ using System.Net.Sockets;
 using System.Threading.Tasks;
 
 namespace BattleShip.Common.Session
-{// Session/PacketSession.cs
+{
     public abstract class PacketSession
     {
         protected TcpClient _client;

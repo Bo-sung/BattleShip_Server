@@ -10,10 +10,10 @@ class Program
     {
         Console.OutputEncoding = System.Text.Encoding.UTF8;
 
+        string dbConnection = Environment.GetEnvironmentVariable("DB_CONNECTION")
+                              ?? "Server=localhost;Database=battleship;User=root;Password=asdf1358;";
         string redisConnection = Environment.GetEnvironmentVariable("REDIS_CONNECTION")
                               ?? "localhost:6379";
-        string dbConnection = Environment.GetEnvironmentVariable("DB_CONNECTION")
-                              ?? "Server=localhost;Database=battleship;User=root;Password=1234;";
         string gameSessionExe = Environment.GetEnvironmentVariable("GAME_SESSION_EXE_PATH")
                      ?? @"H:\Git\Portpolio\BattleShip\Server\BattleShip.GameSession\bin\Debug\net10.0\BattleShip.GameSession.exe";
         int portMin = int.Parse(Environment.GetEnvironmentVariable("GAME_SESSION_PORT_MIN") ?? "7010");

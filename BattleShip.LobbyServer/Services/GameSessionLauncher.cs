@@ -8,6 +8,7 @@ namespace BattleShip.LobbyServer.Services
     {
         public string SessionId { get; set; } = "";
         public int Port { get; set; }
+        public string Host { get; set; } = "127.0.0.1";
         public int ProcessId { get; set; }
         public DateTime StartedAt { get; set; }
         public DateTime LastPingAt { get; set; }
@@ -24,14 +25,16 @@ namespace BattleShip.LobbyServer.Services
         private readonly string _exePath;
         private readonly int _portMin;
         private readonly int _portMax;
+        private readonly string _gameSessionHost;
         private readonly HashSet<int> _usedPorts = new HashSet<int>();
         private readonly object _lock = new object();
 
-        public GameSessionLauncher(string exePath, int portMin, int portMax)
+        public GameSessionLauncher(string exePath, int portMin, int portMax, string gameSessionHost = "127.0.0.1")
         {
             _exePath = exePath;
             _portMin = portMin;
             _portMax = portMax;
+            _gameSessionHost = gameSessionHost;
         }
 
         public SessionInfo Launch(string roomId, string configName = "classic")
@@ -57,6 +60,7 @@ namespace BattleShip.LobbyServer.Services
             {
                 SessionId = sessionId,
                 Port = port,
+                Host = _gameSessionHost,
                 ProcessId = process.Id,
                 StartedAt = DateTime.UtcNow,
                 LastPingAt = DateTime.UtcNow,

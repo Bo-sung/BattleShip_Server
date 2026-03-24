@@ -9,11 +9,15 @@ namespace BattleShip.AuthServer
     {
         private readonly UserRepository _userRepo;
         private readonly TokenService _tokenSvc;
+        private readonly string _lobbyHost;
+        private readonly int _lobbyPort;
 
-        public AuthServer(UserRepository userRepo, TokenService tokenSvc)
+        public AuthServer(UserRepository userRepo, TokenService tokenSvc, string lobbyHost, int lobbyPort)
         {
             _userRepo = userRepo;
             _tokenSvc = tokenSvc;
+            _lobbyHost = lobbyHost;
+            _lobbyPort = lobbyPort;
         }
 
         public async Task StartAsync(int port)
@@ -28,7 +32,7 @@ namespace BattleShip.AuthServer
                 Console.WriteLine("[Auth] 클라이언트 연결");
 
                 // 세션마다 독립 Task로 처리 (await 없이 fire-and-forget)
-                var session = new AuthClientSession(_userRepo, _tokenSvc);
+                var session = new AuthClientSession(_userRepo, _tokenSvc, _lobbyHost, _lobbyPort);
                 _ = session.StartAsync(client);
             }
         }

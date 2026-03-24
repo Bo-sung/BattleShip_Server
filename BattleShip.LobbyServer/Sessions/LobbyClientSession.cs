@@ -212,7 +212,8 @@ namespace BattleShip.LobbyServer.Sessions
                 var gameStart = new S_GameStart
                 {
                     SessionId = sessionInfo.SessionId,
-                    GameServerPort = sessionInfo.Port
+                    GameServerPort = sessionInfo.Port,
+                    GameServerHost = sessionInfo.Host
                 };
 
                 // Store pending — S_GameStart will be sent when SS_SessionReady arrives

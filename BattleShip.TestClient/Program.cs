@@ -14,6 +14,11 @@ class Program
         Console.OutputEncoding = System.Text.Encoding.UTF8;
         Console.InputEncoding = System.Text.Encoding.UTF8;
 
+        Console.Write("Auth 서버 주소 [127.0.0.1]: ");
+        string authHost = Console.ReadLine()!.Trim();
+        if (string.IsNullOrEmpty(authHost)) authHost = "127.0.0.1";
+        GameConfig.AUTH_SERVER_HOST = authHost;
+
         Console.Write("아이디: ");
         string username = Console.ReadLine()!;
         Console.Write("비밀번호: ");
@@ -344,4 +349,5 @@ class Program
         bool isWin = winnerId == myPlayerIndex.ToString();
         Console.WriteLine(isWin ? "\n승리!" : "\n패배...");
     }
+
 }

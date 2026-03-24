@@ -8,17 +8,20 @@ namespace BattleShip.Common.Packets.Lobby
 
         public string SessionId { get; set; }
         public int GameServerPort { get; set; }
+        public string GameServerHost { get; set; } = "";
 
         public void Serialize(PacketWriter writer)
         {
             writer.Write(SessionId);
             writer.Write(GameServerPort);
+            writer.Write(GameServerHost);
         }
 
         public void Deserialize(PacketReader reader)
         {
             SessionId = reader.ReadString();
             GameServerPort = reader.ReadInt();
+            GameServerHost = reader.ReadString();
         }
     }
 }

@@ -10,12 +10,16 @@ namespace BattleShip.AuthServer.Sessions
     {
         private readonly UserRepository _userRepo;
         private readonly TokenService _tokenSvc;
+        private readonly string _lobbyHost;
+        private readonly int _lobbyPort;
         private readonly PacketDispatcher _dispatcher = new PacketDispatcher();
 
-        public AuthClientSession(UserRepository userRepo, TokenService tokenSvc)
+        public AuthClientSession(UserRepository userRepo, TokenService tokenSvc, string lobbyHost, int lobbyPort)
         {
             _userRepo = userRepo;
             _tokenSvc = tokenSvc;
+            _lobbyHost = lobbyHost;
+            _lobbyPort = lobbyPort;
 
             _dispatcher.Register<C_LoginReq>(PacketId.C_LoginReq, OnLogin);
             _dispatcher.Register<C_RegisterReq>(PacketId.C_RegisterReq, OnRegister);
@@ -54,7 +58,9 @@ namespace BattleShip.AuthServer.Sessions
                 {
                     Success = true,
                     Token = token,
-                    Message = ""
+                    Message = "",
+                    LobbyHost = _lobbyHost,
+                    LobbyPort = _lobbyPort
                 });
             }
             catch (Exception ex)

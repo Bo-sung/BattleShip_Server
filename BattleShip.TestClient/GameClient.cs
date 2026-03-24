@@ -20,6 +20,8 @@ public class GameClient : IAsyncDisposable
     private string? _sessionId;
     public int PlayerIndex { get; private set; } = -1;
     public GameRuleConfig RuleConfig { get; private set; } = GameRuleConfig.Default;
+    public string LobbyHost { get; private set; } = "127.0.0.1";
+    public int LobbyPort { get; private set; } = 7002;
 
     private readonly RecvBuffer _lobbyRecvBuf = new RecvBuffer();
     private readonly RecvBuffer _gameRecvBuf  = new RecvBuffer();
@@ -39,6 +41,8 @@ public class GameClient : IAsyncDisposable
             if (res is S_LoginRes { Success: true } login)
             {
                 _token = login.Token;
+                LobbyHost = login.LobbyHost;
+                LobbyPort = login.LobbyPort;
                 Console.WriteLine("로그인 성공\n");
                 return true;
             }
@@ -58,7 +62,7 @@ public class GameClient : IAsyncDisposable
         try
         {
             _lobbyClient = new TcpClient();
-            await _lobbyClient.ConnectAsync(GameConfig.LOBBY_SERVER_HOST, GameConfig.LOBBY_SERVER_PORT);
+            await _lobbyClient.ConnectAsync(LobbyHost, LobbyPort);
             _lobbyStream = _lobbyClient.GetStream();
 
             await SendAsync(_lobbyStream, new C_EnterLobbyReq { Token = _token! });
@@ -204,7 +208,7 @@ public class GameClient : IAsyncDisposable
             await Task.Delay(GameConfig.GAME_CONNECT_DELAY_MS);
 
             _gameClient = new TcpClient();
-            await _gameClient.ConnectAsync(GameConfig.GAME_SERVER_HOST, gameStart.GameServerPort);
+            await _gameClient.ConnectAsync(gameStart.GameServerHost, gameStart.GameServerPort);
             _gameStream = _gameClient.GetStream();
 
             await SendAsync(_gameStream, new C_EnterSessionReq { SessionId = gameStart.SessionId });

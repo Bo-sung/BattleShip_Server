@@ -19,6 +19,7 @@ class Program
                      ?? @"H:\Git\Portpolio\BattleShip\Server\BattleShip.GameSession\bin\Debug\net10.0\BattleShip.GameSession.exe";
         int portMin = int.Parse(Environment.GetEnvironmentVariable("GAME_SESSION_PORT_MIN") ?? "7010");
         int portMax = int.Parse(Environment.GetEnvironmentVariable("GAME_SESSION_PORT_MAX") ?? "7200");
+        string gameSessionHost = Environment.GetEnvironmentVariable("GAME_SESSION_HOST") ?? "127.0.0.1";
 
         var configs = LoadConfigs(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "configs"));
 
@@ -26,7 +27,7 @@ class Program
         var redisDb = redis.GetDatabase();
         var roomMgr = new RoomManager(redisDb);
         var gameRecord = new GameRecordRepository(dbConnection);
-        var launcher = new GameSessionLauncher(gameSessionExe, portMin, portMax);
+        var launcher = new GameSessionLauncher(gameSessionExe, portMin, portMax, gameSessionHost);
         var registry = new SessionRegistry();
         var watchdog = new SessionWatchdog(registry);
 

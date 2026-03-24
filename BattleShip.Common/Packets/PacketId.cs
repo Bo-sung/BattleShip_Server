@@ -32,11 +32,14 @@
         S_OpponentAttack = 3008,
         S_TurnNotify = 3009,
         S_GameOver = 3010,
+        S_GameRuleConfig = 3011,
 
         // 서버 간 (9xxx)
         SS_Ping = 9001,
         SS_Pong = 9002,
         SS_GameResultReq = 9003,
         SS_GameResultAck = 9004,
+        SS_SessionRuleConfig = 9005,
+        SS_SessionReady = 9006,
     }
 }

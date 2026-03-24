@@ -1,4 +1,4 @@
-﻿namespace BattleShip.LobbyServer.Services
+namespace BattleShip.LobbyServer.Services
 {
     public class SessionRegistry
     {
@@ -22,6 +22,22 @@
         public void Remove(string sessionId)
         {
             lock (_lock) { _sessions.Remove(sessionId); }
+        }
+
+        public string GetConfigName(string sessionId)
+        {
+            lock (_lock)
+            {
+                return _sessions.TryGetValue(sessionId, out var info) ? info.ConfigName : "classic";
+            }
+        }
+
+        public SessionInfo? GetSession(string sessionId)
+        {
+            lock (_lock)
+            {
+                return _sessions.TryGetValue(sessionId, out var info) ? info : null;
+            }
         }
 
         public List<SessionInfo> GetAll()

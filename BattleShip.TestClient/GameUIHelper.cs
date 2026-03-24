@@ -1,3 +1,4 @@
+using BattleShip.Common;
 using System;
 
 namespace BattleShip.TestClient;
@@ -6,28 +7,43 @@ public static class GameUIHelper
 {
     private static readonly ConsoleColor[] ShipColors =
     {
-        ConsoleColor.Cyan,      // '0' - 항공모함
-        ConsoleColor.Green,     // '1' - 전함
-        ConsoleColor.Yellow,    // '2' - 순양함
-        ConsoleColor.Magenta,   // '3' - 잠수함
-        ConsoleColor.Red        // '4' - 구축함
+        ConsoleColor.Cyan,
+        ConsoleColor.Green,
+        ConsoleColor.Yellow,
+        ConsoleColor.Magenta,
+        ConsoleColor.Red,
+        ConsoleColor.Blue,
+        ConsoleColor.DarkYellow,
+        ConsoleColor.DarkCyan,
     };
 
-    // 내 보드(함선+피격) 와 상대 보드(공격 결과) 를 나란히 출력
+    private static int _boardSize = 10;
+    private static int _shipCount = 5;
+    private static string[] _shipNames = { "항공모함(5칸)", "전함(4칸)", "순양함(3칸)", "잠수함(3칸)", "구축함(2칸)" };
+
+    public static void Configure(GameRuleConfig config)
+    {
+        _boardSize = config.BoardSize;
+        _shipCount = config.Ships.Count;
+        _shipNames = config.Ships.Select(s => $"{s.Name}({s.Size}칸)").ToArray();
+    }
+
     public static void PrintBothBoards(char[,] myBoard, char[,] enemyBoard)
     {
         Console.WriteLine();
-        Console.WriteLine("  [내 보드]                      [상대 보드]");
-        Console.WriteLine("  0 1 2 3 4 5 6 7 8 9            0 1 2 3 4 5 6 7 8 9");
+        string header = string.Join(" ", Enumerable.Range(0, _boardSize));
+        string padding = new string(' ', 12);
+        Console.WriteLine($"  [내 보드]{padding}[상대 보드]");
+        Console.WriteLine($"  {header}   {header}");
 
-        for (int y = 0; y < GameConfig.BOARD_SIZE; y++)
+        for (int y = 0; y < _boardSize; y++)
         {
             Console.Write($"{y} ");
-            for (int x = 0; x < GameConfig.BOARD_SIZE; x++)
+            for (int x = 0; x < _boardSize; x++)
                 PrintMyBoardCell(myBoard[x, y]);
 
             Console.Write($"   {y} ");
-            for (int x = 0; x < GameConfig.BOARD_SIZE; x++)
+            for (int x = 0; x < _boardSize; x++)
                 PrintEnemyBoardCell(enemyBoard[x, y]);
 
             Console.WriteLine();
@@ -37,11 +53,12 @@ public static class GameUIHelper
 
     public static void PrintPlacementBoard(char[,] map)
     {
-        Console.WriteLine("\n  0 1 2 3 4 5 6 7 8 9");
-        for (int y = 0; y < GameConfig.BOARD_SIZE; y++)
+        string header = string.Join(" ", Enumerable.Range(0, _boardSize));
+        Console.WriteLine($"\n  {header}");
+        for (int y = 0; y < _boardSize; y++)
         {
             Console.Write($"{y} ");
-            for (int x = 0; x < GameConfig.BOARD_SIZE; x++)
+            for (int x = 0; x < _boardSize; x++)
             {
                 char c = map[x, y];
                 if (c == GameConfig.BOARD_EMPTY)
@@ -66,8 +83,8 @@ public static class GameUIHelper
         Console.WriteLine("형식: X Y 방향");
         Console.WriteLine("방향: H=가로 V=세로\n");
 
-        for (int i = 0; i < GameConfig.SHIP_COUNT; i++)
-            Console.WriteLine($"  타입 {i} = {GameConfig.Ships.Names[i]}");
+        for (int i = 0; i < _shipCount; i++)
+            Console.WriteLine($"  타입 {i} = {_shipNames[i]}");
         Console.WriteLine();
     }
 
@@ -84,11 +101,10 @@ public static class GameUIHelper
             0 => "Miss",
             1 => "Hit",
             2 => $"Sunk ({sunkShipName})",
+            3 => "이미 공격한 좌표입니다",
             _ => "?"
         };
     }
-
-    // ── private helpers ─────────────────────────────────────────
 
     private static void PrintMyBoardCell(char c)
     {
@@ -108,9 +124,9 @@ public static class GameUIHelper
                 Console.Write(". ");
                 break;
             default:
-                if (c >= '0' && c < '0' + GameConfig.SHIP_COUNT)
+                if (c >= '0' && c < '0' + _shipCount)
                 {
-                    Console.ForegroundColor = ShipColors[c - '0'];
+                    Console.ForegroundColor = GetShipColor(c);
                     Console.Write($"{c} ");
                     Console.ResetColor();
                 }
@@ -144,8 +160,9 @@ public static class GameUIHelper
 
     private static ConsoleColor GetShipColor(char shipId)
     {
-        if (shipId >= '0' && shipId < '0' + GameConfig.SHIP_COUNT)
-            return ShipColors[shipId - '0'];
+        int idx = shipId - '0';
+        if (idx >= 0 && idx < ShipColors.Length)
+            return ShipColors[idx];
         return ConsoleColor.White;
     }
 }

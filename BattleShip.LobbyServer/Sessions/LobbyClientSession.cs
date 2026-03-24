@@ -215,8 +215,12 @@ namespace BattleShip.LobbyServer.Sessions
                     GameServerPort = sessionInfo.Port
                 };
 
-                await room.Player1.SendAsync(gameStart);
-                await room.Player2.SendAsync(gameStart);
+                // Store pending — S_GameStart will be sent when SS_SessionReady arrives
+                sessionInfo.Player1 = room.Player1;
+                sessionInfo.Player2 = room.Player2;
+                sessionInfo.PendingGameStart = gameStart;
+
+                Console.WriteLine($"[Lobby] 세션 대기 중: {sessionInfo.SessionId} — GameSession Ready 대기");
             }
             catch (Exception ex)
             {

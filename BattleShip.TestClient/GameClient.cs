@@ -1,3 +1,4 @@
+using BattleShip.Common;
 using BattleShip.Common.Network;
 using BattleShip.Common.Packets;
 using BattleShip.Common.Packets.Auth;
@@ -18,8 +19,8 @@ public class GameClient : IAsyncDisposable
     private string? _token;
     private string? _sessionId;
     public int PlayerIndex { get; private set; } = -1;
+    public GameRuleConfig RuleConfig { get; private set; } = GameRuleConfig.Default;
 
-    // 스트림별 수신 버퍼 — 한 번의 ReadAsync에 여러 패킷이 도착해도 유실 없이 처리
     private readonly RecvBuffer _lobbyRecvBuf = new RecvBuffer();
     private readonly RecvBuffer _gameRecvBuf  = new RecvBuffer();
 
@@ -30,7 +31,7 @@ public class GameClient : IAsyncDisposable
             using var auth = new TcpClient();
             await auth.ConnectAsync(GameConfig.AUTH_SERVER_HOST, GameConfig.AUTH_SERVER_PORT);
             var stream = auth.GetStream();
-            var buf = new RecvBuffer();  // 임시 연결이므로 로컬 버퍼
+            var buf = new RecvBuffer();
 
             await SendAsync(stream, new C_LoginReq { Username = username, PasswordHash = password });
             var res = await ReceiveAsync(stream, buf);
@@ -214,6 +215,15 @@ public class GameClient : IAsyncDisposable
                 _sessionId = gameStart.SessionId;
                 PlayerIndex = er.PlayerIndex;
                 Console.WriteLine($"세션 진입 — PlayerIndex: {er.PlayerIndex}");
+
+                // 룰 설정 수신
+                var rulePacket = await ReceiveAsync(_gameStream, _gameRecvBuf);
+                if (rulePacket is S_GameRuleConfig rc)
+                {
+                    RuleConfig = rc.Config;
+                    Console.WriteLine($"룰 수신 — 보드: {rc.Config.BoardSize}x{rc.Config.BoardSize}, 함선: {rc.Config.Ships.Count}종");
+                }
+
                 return true;
             }
 
@@ -325,11 +335,8 @@ public class GameClient : IAsyncDisposable
     {
         while (true)
         {
-            // 버퍼에 이미 완성된 패킷이 있으면 바로 반환
             if (buf.TryReadPacket(out var cached))
             {
-                // Deserialize를 먼저 완료한 뒤 Compact해야 함
-                // Compact가 먼저 실행되면 cached가 가리키는 버퍼 영역이 덮어써짐
                 var packet = PacketSerializer.Deserialize(cached);
                 buf.Compact();
                 return packet;

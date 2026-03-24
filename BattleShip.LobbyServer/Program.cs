@@ -1,4 +1,5 @@
-﻿// BattleShip.LobbyServer/Program.cs
+// BattleShip.LobbyServer/Program.cs
+using BattleShip.Common;
 using BattleShip.LobbyServer;
 using BattleShip.LobbyServer.Repositories;
 using BattleShip.LobbyServer.Services;
@@ -19,6 +20,8 @@ class Program
         int portMin = int.Parse(Environment.GetEnvironmentVariable("GAME_SESSION_PORT_MIN") ?? "7010");
         int portMax = int.Parse(Environment.GetEnvironmentVariable("GAME_SESSION_PORT_MAX") ?? "7200");
 
+        var configs = LoadConfigs(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "configs"));
+
         var redis = await ConnectionMultiplexer.ConnectAsync(redisConnection);
         var redisDb = redis.GetDatabase();
         var roomMgr = new RoomManager(redisDb);
@@ -27,10 +30,65 @@ class Program
         var registry = new SessionRegistry();
         var watchdog = new SessionWatchdog(registry);
 
-        var server = new LobbyServer(redisDb, roomMgr, launcher, registry, gameRecord);
+        var server = new LobbyServer(redisDb, roomMgr, launcher, registry, gameRecord, configs);
 
         _ = watchdog.StartAsync();
 
         await server.StartAsync(port: 7002, internalPort: 8002);
+    }
+
+    static Dictionary<string, GameRuleConfig> LoadConfigs(string configsDir)
+    {
+        var result = new Dictionary<string, GameRuleConfig>(StringComparer.OrdinalIgnoreCase);
+
+        if (!Directory.Exists(configsDir))
+        {
+            Console.WriteLine("[Lobby] configs 디렉토리 없음 — default(classic) 사용");
+            result["classic"] = GameRuleConfig.Default;
+            return result;
+        }
+
+        foreach (var file in Directory.GetFiles(configsDir, "*.json"))
+        {
+            string name = Path.GetFileNameWithoutExtension(file);
+            try
+            {
+                result[name] = LoadConfigFromJson(file);
+                Console.WriteLine($"[Lobby] 룰 로드: {name}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Lobby] 룰 로드 실패 ({name}): {ex.Message}");
+            }
+        }
+
+        if (!result.ContainsKey("classic"))
+            result["classic"] = GameRuleConfig.Default;
+
+        return result;
+    }
+
+    static GameRuleConfig LoadConfigFromJson(string path)
+    {
+        var json = File.ReadAllText(path);
+        var doc = System.Text.Json.JsonDocument.Parse(json);
+        var root = doc.RootElement;
+
+        var config = new GameRuleConfig
+        {
+            BoardSize = root.GetProperty("boardSize").GetInt32()
+        };
+
+        foreach (var ship in root.GetProperty("ships").EnumerateArray())
+        {
+            config.Ships.Add(new ShipDefinition
+            {
+                Type = ship.GetProperty("type").GetByte(),
+                Name = ship.GetProperty("name").GetString()!,
+                Size = ship.GetProperty("size").GetInt32(),
+            });
+        }
+
+        return config;
     }
 }

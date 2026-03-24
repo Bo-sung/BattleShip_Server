@@ -75,12 +75,15 @@ namespace BattleShip.Common.Network
                 PacketId.S_OpponentAttack => new S_OpponentAttack(),
                 PacketId.S_TurnNotify => new S_TurnNotify(),
                 PacketId.S_GameOver => new S_GameOver(),
+                PacketId.S_GameRuleConfig => new S_GameRuleConfig(),
 
                 // 서버 간
                 PacketId.SS_Ping => new SS_Ping(),
                 PacketId.SS_Pong => new SS_Pong(),
                 PacketId.SS_GameResultReq => new SS_GameResultReq(),
                 PacketId.SS_GameResultAck => new SS_GameResultAck(),
+                PacketId.SS_SessionRuleConfig => new SS_SessionRuleConfig(),
+                PacketId.SS_SessionReady => new SS_SessionReady(),
 
                 _ => throw new Exception($"알 수 없는 PacketId: {header.PacketId}")
             };

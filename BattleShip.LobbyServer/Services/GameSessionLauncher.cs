@@ -1,14 +1,22 @@
-﻿using System.Diagnostics;
+using BattleShip.Common.Packets.Lobby;
+using BattleShip.LobbyServer.Sessions;
+using System.Diagnostics;
 
 namespace BattleShip.LobbyServer.Services
 {
     public class SessionInfo
     {
-        public string SessionId { get; set; }
+        public string SessionId { get; set; } = "";
         public int Port { get; set; }
         public int ProcessId { get; set; }
         public DateTime StartedAt { get; set; }
         public DateTime LastPingAt { get; set; }
+        public string ConfigName { get; set; } = "classic";
+
+        // Pending: waiting to send S_GameStart when session is ready
+        public LobbyClientSession? Player1 { get; set; }
+        public LobbyClientSession? Player2 { get; set; }
+        public S_GameStart? PendingGameStart { get; set; }
     }
 
     public class GameSessionLauncher
@@ -26,7 +34,7 @@ namespace BattleShip.LobbyServer.Services
             _portMax = portMax;
         }
 
-        public SessionInfo Launch(string roomId)
+        public SessionInfo Launch(string roomId, string configName = "classic")
         {
             int port = AllocatePort();
             string sessionId = Guid.NewGuid().ToString("N")[..8];
@@ -42,7 +50,6 @@ namespace BattleShip.LobbyServer.Services
             var process = Process.Start(psi)
                 ?? throw new Exception("GameSession 프로세스 시작 실패");
 
-            // 프로세스 종료 시 포트 반환
             process.EnableRaisingEvents = true;
             process.Exited += (s, e) => ReleasePort(port);
 
@@ -53,6 +60,7 @@ namespace BattleShip.LobbyServer.Services
                 ProcessId = process.Id,
                 StartedAt = DateTime.UtcNow,
                 LastPingAt = DateTime.UtcNow,
+                ConfigName = configName,
             };
         }
 

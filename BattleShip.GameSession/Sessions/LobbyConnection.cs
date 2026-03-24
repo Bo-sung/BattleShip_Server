@@ -1,4 +1,5 @@
-﻿using BattleShip.Common.Network;
+using BattleShip.Common;
+using BattleShip.Common.Network;
 using BattleShip.Common.Packets;
 using BattleShip.Common.Packets.ServerInternal;
 using System.Net.Sockets;
@@ -12,10 +13,22 @@ namespace BattleShip.GameSession.Sessions
         private NetworkStream? _stream;
         private SS_GameResultAck? _pendingAck;
         private readonly SemaphoreSlim _ackSignal = new SemaphoreSlim(0, 1);
+        private readonly TaskCompletionSource<GameRuleConfig> _ruleConfigTcs = new TaskCompletionSource<GameRuleConfig>();
 
         public LobbyConnection(string sessionId)
         {
             _sessionId = sessionId;
+        }
+
+        // standalone 모드: Lobby 연결 전에 미리 config 설정
+        public void SetRuleConfig(GameRuleConfig config)
+        {
+            _ruleConfigTcs.TrySetResult(config);
+        }
+
+        public Task<GameRuleConfig> WaitForRuleConfigAsync()
+        {
+            return _ruleConfigTcs.Task;
         }
 
         public async Task ConnectAsync(string host, int port)
@@ -26,10 +39,7 @@ namespace BattleShip.GameSession.Sessions
 
             Console.WriteLine($"[Session:{_sessionId}] Lobby 역접속 성공");
 
-            // 수신 루프 (SS_Pong, SS_GameResultAck 처리)
             _ = ReceiveLoopAsync();
-
-            // 핑 루프 시작
             _ = PingLoopAsync();
         }
 
@@ -37,7 +47,6 @@ namespace BattleShip.GameSession.Sessions
         {
             while (true)
             {
-                await Task.Delay(5000);
                 try
                 {
                     await SendAsync(new SS_Ping
@@ -50,6 +59,7 @@ namespace BattleShip.GameSession.Sessions
                 {
                     Console.WriteLine($"[Session:{_sessionId}] Ping 전송 실패");
                 }
+                await Task.Delay(5000);
             }
         }
 
@@ -75,6 +85,11 @@ namespace BattleShip.GameSession.Sessions
                             _pendingAck = ack;
                             _ackSignal.Release();
                         }
+                        else if (packet is SS_SessionRuleConfig ruleConfig)
+                        {
+                            Console.WriteLine($"[Session:{_sessionId}] 룰 수신 완료 (boardSize={ruleConfig.Config.BoardSize}, ships={ruleConfig.Config.Ships.Count})");
+                            _ruleConfigTcs.TrySetResult(ruleConfig.Config);
+                        }
                     }
 
                     recvBuffer.Compact();
@@ -83,14 +98,26 @@ namespace BattleShip.GameSession.Sessions
             catch (Exception ex)
             {
                 Console.WriteLine($"[Session:{_sessionId}] Lobby 수신 오류: {ex.Message}");
+                _ruleConfigTcs.TrySetException(ex);
             }
         }
 
-        // 게임 결과 전송 → ACK 대기 (최대 5초)
+        public async Task NotifyReadyAsync()
+        {
+            try
+            {
+                await SendAsync(new SS_SessionReady { SessionId = _sessionId });
+                Console.WriteLine($"[Session:{_sessionId}] Ready 알림 전송");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Session:{_sessionId}] Ready 알림 실패: {ex.Message}");
+            }
+        }
+
         public async Task<bool> SendGameResultAsync(SS_GameResultReq req)
         {
             await SendAsync(req);
-
             bool received = await _ackSignal.WaitAsync(TimeSpan.FromSeconds(5));
             return received && (_pendingAck?.Success ?? false);
         }

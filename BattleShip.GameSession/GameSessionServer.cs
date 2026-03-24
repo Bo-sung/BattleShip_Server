@@ -1,4 +1,5 @@
-﻿using BattleShip.Common.Packets;
+using BattleShip.Common;
+using BattleShip.Common.Packets;
 using BattleShip.Common.Packets.Game;
 using BattleShip.Common.Packets.ServerInternal;
 using BattleShip.GameSession.Game;
@@ -14,30 +15,44 @@ namespace BattleShip.GameSession
         private readonly int _port;
         private readonly string _lobbyHost;
         private readonly int _lobbyPort;
+        private readonly GameRuleConfig? _standaloneConfig;
 
         private PlayerSession? _player1;
         private PlayerSession? _player2;
         private LobbyConnection? _lobbyConn;
-        private GameState _gameState = new GameState();
+        private GameRuleConfig _ruleConfig = GameRuleConfig.Default;
+        private GameState _gameState = null!;
         private int _turnCount = 0;
 
         private readonly CancellationTokenSource _cts = new CancellationTokenSource();
 
-        public GameSessionServer(string sessionId, int port, string lobbyHost, int lobbyPort)
+        public GameSessionServer(string sessionId, int port, string lobbyHost, int lobbyPort, GameRuleConfig? standaloneConfig = null)
         {
             _sessionId = sessionId;
             _port = port;
             _lobbyHost = lobbyHost;
             _lobbyPort = lobbyPort;
+            _standaloneConfig = standaloneConfig;
         }
 
         public async Task RunAsync()
         {
             // 1. Lobby에 역접속
             _lobbyConn = new LobbyConnection(_sessionId);
+
+            // standalone 모드: 파일에서 읽은 config를 미리 주입
+            if (_standaloneConfig != null)
+                _lobbyConn.SetRuleConfig(_standaloneConfig);
+
             await _lobbyConn.ConnectAsync(_lobbyHost, _lobbyPort);
 
-            // 2. 클라이언트 2명 수락 (타임아웃 60초)
+            // 2. 룰 수신 대기 (standalone이면 즉시 반환)
+            _ruleConfig = await _lobbyConn.WaitForRuleConfigAsync();
+            _gameState = new GameState(_ruleConfig);
+
+            Console.WriteLine($"[Session:{_sessionId}] 룰 적용 — 보드 {_ruleConfig.BoardSize}x{_ruleConfig.BoardSize}, 함선 {_ruleConfig.Ships.Count}종");
+
+            // 3. 클라이언트 2명 수락 (타임아웃 60초)
             if (!await AcceptPlayersAsync())
             {
                 Console.WriteLine($"[Session:{_sessionId}] 접속 타임아웃 — 종료");
@@ -46,11 +61,11 @@ namespace BattleShip.GameSession
 
             Console.WriteLine($"[Session:{_sessionId}] 플레이어 2명 접속 완료");
 
-            // 3. 수신 루프 시작
+            // 4. 수신 루프 시작
             _ = _player1!.StartAsync();
             _ = _player2!.StartAsync();
 
-            // 4. 게임 종료까지 대기
+            // 5. 게임 종료까지 대기
             await Task.Delay(Timeout.Infinite, _cts.Token).ContinueWith(_ => { });
 
             Console.WriteLine($"[Session:{_sessionId}] 종료");
@@ -60,6 +75,10 @@ namespace BattleShip.GameSession
         {
             var listener = new TcpListener(IPAddress.Any, _port);
             listener.Start();
+            Console.WriteLine($"[Session:{_sessionId}] 포트 {_port} 오픈");
+
+            // 포트가 열렸음을 Lobby에 알림 → Lobby가 클라이언트에게 S_GameStart 전송
+            await _lobbyConn!.NotifyReadyAsync();
 
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
@@ -97,6 +116,7 @@ namespace BattleShip.GameSession
                 Success = true,
                 PlayerIndex = (byte)playerIndex
             });
+            await session.SendAsync(new S_GameRuleConfig { Config = _ruleConfig });
         }
 
         public async Task OnPlaceShips(int playerIndex, C_PlaceShipsReq req)
@@ -124,10 +144,8 @@ namespace BattleShip.GameSession
             {
                 Console.WriteLine($"[Session:{_sessionId}] 배치 완료 — 선공: Player {_gameState.CurrentTurn}");
 
-                // 양쪽에 배치 완료 알림
                 await BroadcastAsync(new S_PlacementDone());
 
-                // 선공 통보
                 await _player1!.SendAsync(new S_TurnNotify { IsMyTurn = _gameState.CurrentTurn == 0 });
                 await _player2!.SendAsync(new S_TurnNotify { IsMyTurn = _gameState.CurrentTurn == 1 });
             }
@@ -135,13 +153,23 @@ namespace BattleShip.GameSession
 
         public async Task OnAttack(int playerIndex, C_AttackReq req)
         {
-            // 내 턴이 아님 → 무시
             if (!_gameState.IsMyTurn(playerIndex))
                 return;
 
-            // 게임 진행 중이 아님 → 무시
             if (_gameState.Phase != GamePhase.InProgress)
                 return;
+
+            if (_gameState.Boards[1 - playerIndex].IsAlreadyAttacked(req.X, req.Y))
+            {
+                await GetPlayer(playerIndex).SendAsync(new S_AttackRes
+                {
+                    X = req.X,
+                    Y = req.Y,
+                    Result = 3,
+                    SunkShipName = null
+                });
+                return;
+            }
 
             _turnCount++;
 
@@ -150,7 +178,6 @@ namespace BattleShip.GameSession
             var attacker = GetPlayer(playerIndex);
             var defender = GetPlayer(1 - playerIndex);
 
-            // 공격자에게 결과
             await attacker.SendAsync(new S_AttackRes
             {
                 X = req.X,
@@ -159,7 +186,6 @@ namespace BattleShip.GameSession
                 SunkShipName = sunkShipName
             });
 
-            // 수비자에게 피격 알림
             await defender.SendAsync(new S_OpponentAttack
             {
                 X = req.X,
@@ -174,7 +200,6 @@ namespace BattleShip.GameSession
                 return;
             }
 
-            // 턴 전환 통보
             await _player1!.SendAsync(new S_TurnNotify { IsMyTurn = _gameState.CurrentTurn == 0 });
             await _player2!.SendAsync(new S_TurnNotify { IsMyTurn = _gameState.CurrentTurn == 1 });
         }
@@ -189,7 +214,6 @@ namespace BattleShip.GameSession
             string winnerId = (1 - playerIndex).ToString();
             string loserId = playerIndex.ToString();
 
-            // 남은 플레이어에게 게임 종료 알림
             var winner = GetPlayer(1 - playerIndex);
             await winner.SendAsync(new S_GameOver { WinnerId = winnerId, Reason = 1 });
 
@@ -198,14 +222,13 @@ namespace BattleShip.GameSession
 
         private async Task FinishGameAsync(string winnerId, string loserId, byte reason)
         {
-            // 양쪽에 게임 종료 알림
             await BroadcastAsync(new S_GameOver { WinnerId = winnerId, Reason = reason });
             await SendGameResultToLobbyAsync(winnerId, loserId);
         }
 
         private async Task SendGameResultToLobbyAsync(string winnerId, string loserId)
         {
-            _gameState = new GameState();  // Phase = GameOver 방지용 재진입 차단
+            _gameState = new GameState(_ruleConfig);  // Phase = GameOver 방지용 재진입 차단
 
             for (int retry = 0; retry < 3; retry++)
             {

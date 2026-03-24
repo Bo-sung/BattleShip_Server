@@ -1,4 +1,5 @@
-﻿using BattleShip.Common.Packets.Game;
+using BattleShip.Common;
+using BattleShip.Common.Packets.Game;
 using BattleShip.Common.Packets.Lobby;
 using BattleShip.TestClient;
 
@@ -6,6 +7,8 @@ namespace BattleShip.TestClient;
 
 class Program
 {
+    private static GameRuleConfig _ruleConfig = GameRuleConfig.Default;
+
     static async Task Main(string[] args)
     {
         Console.OutputEncoding = System.Text.Encoding.UTF8;
@@ -45,6 +48,10 @@ class Program
             Console.ReadKey();
             return;
         }
+
+        // 서버에서 받은 룰 적용
+        _ruleConfig = gameClient.RuleConfig;
+        GameUIHelper.Configure(_ruleConfig);
 
         // ── 5. 배 배치 ─────────────────────────────────────────────
         GameUIHelper.PrintShipPlacementGuide();
@@ -170,8 +177,13 @@ class Program
                     string resultStr = GameUIHelper.GetAttackResultString(attackRes.Result, attackRes.SunkShipName);
                     Console.WriteLine($"공격 결과: ({attackRes.X},{attackRes.Y}) → {resultStr}");
 
-                    enemyBoard[attackRes.X, attackRes.Y] =
-                        attackRes.Result == 0 ? GameConfig.BOARD_MISS : GameConfig.BOARD_HIT;
+                    if (attackRes.Result == 3)
+                        continue;
+
+                    if (attackRes.Result == 0)
+                        enemyBoard[attackRes.X, attackRes.Y] = GameConfig.BOARD_MISS;
+                    else
+                        enemyBoard[attackRes.X, attackRes.Y] = GameConfig.BOARD_HIT;
                 }
 
                 var next = await gameClient.ReceiveGamePacketAsync();
@@ -226,9 +238,10 @@ class Program
 
     private static char[,] InitializeBoard()
     {
-        var board = new char[GameConfig.BOARD_SIZE, GameConfig.BOARD_SIZE];
-        for (int y = 0; y < GameConfig.BOARD_SIZE; y++)
-            for (int x = 0; x < GameConfig.BOARD_SIZE; x++)
+        int size = _ruleConfig.BoardSize;
+        var board = new char[size, size];
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
                 board[x, y] = GameConfig.BOARD_EMPTY;
         return board;
     }
@@ -239,11 +252,12 @@ class Program
         var boardMap = InitializeBoard();
         GameUIHelper.PrintPlacementBoard(boardMap);
 
-        for (int i = 0; i < GameConfig.SHIP_COUNT; i++)
+        for (int i = 0; i < _ruleConfig.Ships.Count; i++)
         {
+            var shipDef = _ruleConfig.Ships[i];
             while (true)
             {
-                Console.Write($"\n함선 {i}번 [{GameConfig.Ships.Names[i]}]: ");
+                Console.Write($"\n함선 {i}번 [{shipDef.Name}({shipDef.Size}칸)]: ");
                 var parts = Console.ReadLine()!.Trim().Split(' ');
 
                 if (!ValidateShipPlacement(parts, out byte x, out byte y, out bool horizontal))
@@ -252,23 +266,22 @@ class Program
                     continue;
                 }
 
-                int size = GameConfig.Ships.Sizes[i];
-                if (!CheckBoundaries(x, y, size, horizontal))
+                if (!CheckBoundaries(x, y, shipDef.Size, horizontal))
                 {
                     Console.WriteLine("  범위 초과. 다시 입력해주세요.");
                     continue;
                 }
 
-                if (CheckOverlap(boardMap, x, y, size, horizontal))
+                if (CheckOverlap(boardMap, x, y, shipDef.Size, horizontal))
                 {
                     Console.WriteLine("  다른 함선과 겹칩니다. 다시 입력해주세요.");
                     continue;
                 }
 
-                PlaceShipOnBoard(boardMap, x, y, size, horizontal, (char)('0' + i));
+                PlaceShipOnBoard(boardMap, x, y, shipDef.Size, horizontal, (char)('0' + i));
                 placements.Add(new ShipPlacement
                 {
-                    ShipType = (byte)i,
+                    ShipType = shipDef.Type,
                     X = x,
                     Y = y,
                     IsHorizontal = horizontal
@@ -288,18 +301,20 @@ class Program
         y = 0;
         horizontal = true;
 
+        int boardSize = _ruleConfig.BoardSize;
         return parts.Length >= 3
-            && byte.TryParse(parts[0], out x) && x < GameConfig.BOARD_SIZE
-            && byte.TryParse(parts[1], out y) && y < GameConfig.BOARD_SIZE
+            && byte.TryParse(parts[0], out x) && x < boardSize
+            && byte.TryParse(parts[1], out y) && y < boardSize
             && (parts[2].ToUpper() == "H" || parts[2].ToUpper() == "V")
             && (horizontal = parts[2].ToUpper() == "H") == horizontal;
     }
 
     private static bool CheckBoundaries(byte x, byte y, int size, bool horizontal)
     {
+        int boardSize = _ruleConfig.BoardSize;
         return horizontal
-            ? x + size <= GameConfig.BOARD_SIZE
-            : y + size <= GameConfig.BOARD_SIZE;
+            ? x + size <= boardSize
+            : y + size <= boardSize;
     }
 
     private static bool CheckOverlap(char[,] boardMap, byte x, byte y, int size, bool horizontal)

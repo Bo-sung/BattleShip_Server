@@ -1,41 +1,53 @@
-﻿using BattleShip.Common.Packets.Game;
+﻿using BattleShip.Common;
+using BattleShip.Common.Packets.Game;
 
 namespace BattleShip.GameSession.Game
 {
     public class Board
     {
-        private readonly bool[,] _ships = new bool[10, 10];  // 함선 위치
-        private readonly bool[,] _hits = new bool[10, 10];  // 공격 받은 위치
-        private readonly Ship?[,] _shipAt = new Ship[10, 10];  // 좌표별 함선 참조
+        private readonly int _boardSize;
+        private readonly Dictionary<byte, ShipDefinition> _shipDefs;
+        private readonly bool[,] _ships;
+        private readonly bool[,] _hits;
+        private readonly Ship?[,] _shipAt;
         private readonly List<Ship> _shipList = new List<Ship>();
+
+        public Board(GameRuleConfig config)
+        {
+            _boardSize = config.BoardSize;
+            _shipDefs = config.Ships.ToDictionary(s => s.Type);
+            _ships = new bool[_boardSize, _boardSize];
+            _hits = new bool[_boardSize, _boardSize];
+            _shipAt = new Ship[_boardSize, _boardSize];
+        }
 
         public bool PlaceShips(List<ShipPlacement> placements)
         {
-            // 5종류 함선 모두 있는지 확인
-            if (placements.Count != 5)
+            if (placements.Count != _shipDefs.Count)
                 return false;
 
             var types = placements.Select(p => p.ShipType).Distinct().ToList();
-            if (types.Count != 5)
+            if (types.Count != _shipDefs.Count)
                 return false;
 
-            // 임시 배치 후 유효성 검증
-            var temp = new bool[10, 10];
+            if (!types.All(t => _shipDefs.ContainsKey(t)))
+                return false;
+
+            var temp = new bool[_boardSize, _boardSize];
 
             foreach (var p in placements)
             {
-                var ship = Ship.Create(p.ShipType);
+                var def = _shipDefs[p.ShipType];
+                var ship = Ship.Create(def);
 
                 for (int i = 0; i < ship.Size; i++)
                 {
                     int x = p.IsHorizontal ? p.X + i : p.X;
                     int y = p.IsHorizontal ? p.Y : p.Y + i;
 
-                    // 범위 초과
-                    if (x < 0 || x >= 10 || y < 0 || y >= 10)
+                    if (x < 0 || x >= _boardSize || y < 0 || y >= _boardSize)
                         return false;
 
-                    // 겹침
                     if (temp[x, y])
                         return false;
 
@@ -43,10 +55,9 @@ namespace BattleShip.GameSession.Game
                 }
             }
 
-            // 검증 통과 → 실제 배치
             foreach (var p in placements)
             {
-                var ship = Ship.Create(p.ShipType);
+                var ship = Ship.Create(_shipDefs[p.ShipType]);
                 _shipList.Add(ship);
 
                 for (int i = 0; i < ship.Size; i++)
@@ -62,25 +73,26 @@ namespace BattleShip.GameSession.Game
             return true;
         }
 
-        // 공격 처리. 반환값: 0=Miss, 1=Hit, 2=Sunk
         public (byte result, string sunkShipName) Attack(byte x, byte y)
         {
             if (_hits[x, y])
-                return (0, "");  // 이미 공격한 좌표
+                return (0, "");
 
             _hits[x, y] = true;
 
             if (!_ships[x, y])
-                return (0, "");  // Miss
+                return (0, "");
 
             var ship = _shipAt[x, y]!;
             ship.HitCount++;
 
             if (ship.IsSunk)
-                return (2, ship.Name);  // Sunk
+                return (2, ship.Name);
 
-            return (1, "");  // Hit
+            return (1, "");
         }
+
+        public bool IsAlreadyAttacked(byte x, byte y) => _hits[x, y];
 
         public bool IsAllSunk() => _shipList.All(s => s.IsSunk);
     }

@@ -1,4 +1,5 @@
-﻿using BattleShip.Common.Network;
+using BattleShip.Common;
+using BattleShip.Common.Network;
 using BattleShip.Common.Packets;
 using BattleShip.Common.Packets.ServerInternal;
 using BattleShip.Common.Session;
@@ -11,17 +12,23 @@ namespace BattleShip.LobbyServer.Sessions
     {
         private readonly SessionRegistry _registry;
         private readonly GameRecordRepository _gameRecord;
+        private readonly Dictionary<string, GameRuleConfig> _configs;
         private readonly PacketDispatcher _dispatcher = new PacketDispatcher();
 
-        private string _sessionId;
+        private string _sessionId = "";
 
-        public GameSessionConnection(SessionRegistry registry, GameRecordRepository gameRecord)
+        public GameSessionConnection(
+            SessionRegistry registry,
+            GameRecordRepository gameRecord,
+            Dictionary<string, GameRuleConfig> configs)
         {
             _registry = registry;
             _gameRecord = gameRecord;
+            _configs = configs;
 
             _dispatcher.Register<SS_Ping>(PacketId.SS_Ping, OnPing);
             _dispatcher.Register<SS_GameResultReq>(PacketId.SS_GameResultReq, OnGameResult);
+            _dispatcher.Register<SS_SessionReady>(PacketId.SS_SessionReady, OnSessionReady);
         }
 
         protected override void OnPacketReceived(IPacket packet)
@@ -38,17 +45,50 @@ namespace BattleShip.LobbyServer.Sessions
         {
             try
             {
+                bool isFirstPing = string.IsNullOrEmpty(_sessionId);
                 _sessionId = ping.SessionId;
                 _registry.UpdatePing(ping.SessionId);
 
-                await SendAsync(new SS_Pong
+                await SendAsync(new SS_Pong { Timestamp = ping.Timestamp });
+
+                if (isFirstPing)
                 {
-                    Timestamp = ping.Timestamp
-                });
+                    string configName = _registry.GetConfigName(ping.SessionId);
+                    var config = _configs.TryGetValue(configName, out var found) ? found : GameRuleConfig.Default;
+
+                    await SendAsync(new SS_SessionRuleConfig { Config = config });
+                    Console.WriteLine($"[Lobby] 룰 전송: {ping.SessionId} → {configName}");
+                }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[Lobby] Ping 오류: {ex.Message}");
+            }
+        }
+
+        private async void OnSessionReady(SS_SessionReady ready)
+        {
+            try
+            {
+                var info = _registry.GetSession(ready.SessionId);
+                if (info?.PendingGameStart == null)
+                {
+                    Console.WriteLine($"[Lobby] SessionReady: 세션 없음 또는 이미 처리됨 — {ready.SessionId}");
+                    return;
+                }
+
+                await info.Player1!.SendAsync(info.PendingGameStart);
+                await info.Player2!.SendAsync(info.PendingGameStart);
+
+                info.Player1 = null;
+                info.Player2 = null;
+                info.PendingGameStart = null;
+
+                Console.WriteLine($"[Lobby] S_GameStart 전송 완료: {ready.SessionId}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Lobby] SessionReady 오류: {ex.Message}");
             }
         }
 

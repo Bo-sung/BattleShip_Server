@@ -1,4 +1,5 @@
-﻿using BattleShip.LobbyServer.Repositories;
+using BattleShip.Common;
+using BattleShip.LobbyServer.Repositories;
 using BattleShip.LobbyServer.Services;
 using BattleShip.LobbyServer.Sessions;
 using StackExchange.Redis;
@@ -14,27 +15,27 @@ namespace BattleShip.LobbyServer
         private readonly GameSessionLauncher _launcher;
         private readonly SessionRegistry _registry;
         private readonly GameRecordRepository _gameRecord;
+        private readonly Dictionary<string, GameRuleConfig> _configs;
 
         public LobbyServer(
             IDatabase redis,
             RoomManager roomMgr,
             GameSessionLauncher launcher,
             SessionRegistry registry,
-            GameRecordRepository gameRecord)
+            GameRecordRepository gameRecord,
+            Dictionary<string, GameRuleConfig> configs)
         {
             _redis = redis;
             _roomMgr = roomMgr;
             _launcher = launcher;
             _registry = registry;
             _gameRecord = gameRecord;
+            _configs = configs;
         }
 
         public async Task StartAsync(int port, int internalPort)
         {
-            // 클라이언트 연결 수락
             _ = AcceptClientsAsync(port);
-
-            // GameSession 역접속 수신
             _ = AcceptSessionConnectionsAsync(internalPort);
 
             Console.WriteLine($"[Lobby] 시작 — 클라이언트 :{port}, 내부 :{internalPort}");
@@ -67,7 +68,7 @@ namespace BattleShip.LobbyServer
                 var client = await listener.AcceptTcpClientAsync();
                 Console.WriteLine("[Lobby] GameSession 역접속");
 
-                var conn = new GameSessionConnection(_registry, _gameRecord);
+                var conn = new GameSessionConnection(_registry, _gameRecord, _configs);
                 _ = conn.StartAsync(client);
             }
         }

@@ -46,6 +46,29 @@ DEFAULT_DEPLOY_PATHS = {
     "osx-arm64":  "~/battleship",
 }
 
+# ── 환경변수 설정 ─────────────────────────────────────────────────────
+
+ENV_FILE = SCRIPT_DIR / "deploy.env"
+
+# (환경변수 키, 설명, 기본값)
+ENV_VARS = [
+    ("DB_CONNECTION",          "MySQL 연결 문자열",          "Server=localhost;Database=battleship;User=root;Password="),
+    ("REDIS_CONNECTION",       "Redis 연결 문자열",          "localhost:6379"),
+    ("LOBBY_HOST",             "LobbyServer 호스트 (클라이언트가 접속할 주소)", "127.0.0.1"),
+    ("LOBBY_PORT",             "LobbyServer 포트",           "7002"),
+    ("GAME_SESSION_HOST",      "GameSession 호스트 (클라이언트가 접속할 주소)", "127.0.0.1"),
+    ("GAME_SESSION_EXE_PATH",  "GameSession 실행 파일 경로", ""),
+]
+
+# OS별 GameSession 기본 실행 경로
+GAME_SESSION_EXE_DEFAULTS = {
+    "win-x64":    r"C:\battleship\gamesession\BattleShip.GameSession.exe",
+    "linux-x64":  "~/battleship/gamesession/BattleShip.GameSession",
+    "linux-arm64":"~/battleship/gamesession/BattleShip.GameSession",
+    "osx-x64":    "~/battleship/gamesession/BattleShip.GameSession",
+    "osx-arm64":  "~/battleship/gamesession/BattleShip.GameSession",
+}
+
 # ── 입력 헬퍼 ────────────────────────────────────────────────────────
 
 def prompt(label: str, default: str = None, secret: bool = False) -> str:
@@ -85,6 +108,81 @@ def select_one(options: dict, title: str) -> str:
         if choice in options:
             return choice
         print("  올바른 번호를 입력하세요.")
+
+
+# ── 환경변수 관리 ─────────────────────────────────────────────────────
+
+def load_env_config(game_session_exe_default: str = "") -> dict:
+    """deploy.env 파일을 읽거나, 없으면 사용자에게 입력받아 저장합니다."""
+    config = {}
+
+    if ENV_FILE.exists():
+        print(f"\n[환경설정] {ENV_FILE.name} 파일을 읽습니다.")
+        with open(ENV_FILE, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, _, val = line.partition("=")
+                    config[key.strip()] = val.strip()
+
+        # 누락된 키가 있으면 추가 입력
+        missing = [v for v in ENV_VARS if v[0] not in config]
+        if missing:
+            print("  누락된 설정값을 입력해주세요:")
+            for key, label, default in missing:
+                if key == "GAME_SESSION_EXE_PATH" and not default:
+                    default = game_session_exe_default
+                config[key] = prompt(f"  {label} ({key})", default=default)
+        else:
+            print("  모든 설정값이 로드되었습니다.")
+            for key, _, _ in ENV_VARS:
+                val = config.get(key, "")
+                display = val if "password" not in key.lower() else val[:20] + "..."
+                print(f"    {key}={display}")
+    else:
+        print(f"\n[환경설정] deploy.env 파일이 없습니다. 값을 입력해주세요.")
+        print("  (저장 후 다음 배포 시 재사용됩니다)\n")
+        for key, label, default in ENV_VARS:
+            if key == "GAME_SESSION_EXE_PATH" and not default:
+                default = game_session_exe_default
+            config[key] = prompt(f"  {label} ({key})", default=default)
+
+    # deploy.env 저장
+    with open(ENV_FILE, "w", encoding="utf-8") as f:
+        f.write("# BattleShip 서버 환경 설정\n")
+        f.write("# 이 파일은 .gitignore에 추가하세요 (비밀번호 포함)\n\n")
+        for key, label, _ in ENV_VARS:
+            f.write(f"# {label}\n")
+            f.write(f"{key}={config.get(key, '')}\n\n")
+
+    print(f"  [{ENV_FILE.name}] 저장 완료")
+    return config
+
+
+def upload_env(ssh: paramiko.SSHClient, sftp: paramiko.SFTPClient,
+               remote_base: str, env_config: dict, runtime: str):
+    """환경변수 파일을 서버에 업로드합니다."""
+    lines = ["# BattleShip 서버 환경 설정 (자동 생성)\n"]
+    for key, val in env_config.items():
+        lines.append(f"{key}={val}\n")
+
+    # SFTP 경로는 항상 forward slash
+    remote_base_sftp = remote_base.replace("\\", "/")
+    remote_env_sftp  = f"{remote_base_sftp}/.env"
+
+    # 디렉토리 먼저 생성
+    if runtime == "win-x64":
+        run_remote(ssh, f'mkdir "{remote_base}" 2>nul', ignore_error=True)
+    else:
+        run_remote(ssh, f"mkdir -p {remote_base}")
+
+    with sftp.open(remote_env_sftp, "w") as f:
+        f.writelines(lines)
+
+    if runtime != "win-x64":
+        sftp.chmod(remote_env_sftp, 0o600)
+
+    print(f"  [환경설정] {remote_env_sftp} 업로드 완료")
 
 
 # ── 빌드 ─────────────────────────────────────────────────────────────
@@ -398,6 +496,7 @@ def deploy_linux(ssh, sftp, service_name: str, project_name: str,
         f"Type=simple\n"
         f"User={username}\n"
         f"WorkingDirectory={remote_dir}\n"
+        f"EnvironmentFile=-{remote_base}/.env\n"
         f"ExecStart={remote_dir}/{exe}\n"
         f"Restart=on-failure\n"
         f"RestartSec=5\n"
@@ -432,13 +531,32 @@ def deploy_macos(ssh, sftp, service_name: str, project_name: str,
 
     print(f"\n[배포] {service_name} → {remote_dir}")
 
-    # 기존 에이전트 언로드
+    # 기존 에이전트 언로드 (bootout 우선, 실패 시 unload 폴백)
+    uid_code, uid_out, _ = run_remote(ssh, "id -u", ignore_error=True)
+    uid = uid_out.strip() if uid_code == 0 else ""
+    if uid:
+        run_remote(ssh, f"launchctl bootout gui/{uid} {plist_path} 2>/dev/null || true", ignore_error=True)
     run_remote(ssh, f"launchctl unload {plist_path} 2>/dev/null || true", ignore_error=True)
+    # 프로세스가 완전히 종료될 때까지 대기
+    run_remote(ssh, f"pkill -f {exe} 2>/dev/null || true", ignore_error=True)
 
     # 파일 업로드
     run_remote(ssh, f"mkdir -p {remote_dir}")
     upload_directory(sftp, local_dir, remote_dir)
     run_remote(ssh, f"chmod +x {remote_dir}/{exe}")
+
+    # 래퍼 쉘 스크립트 생성 (.env 로드 후 실행)
+    wrapper_path = f"{remote_base}/run_{service_name.lower()}.sh"
+    wrapper = (
+        "#!/bin/bash\n"
+        "set -a\n"
+        f'source "{remote_base}/.env"\n'
+        "set +a\n"
+        f'exec "{remote_dir}/{exe}" "$@"\n'
+    )
+    with sftp.open(wrapper_path, "w") as f:
+        f.write(wrapper)
+    run_remote(ssh, f"chmod +x {wrapper_path}")
 
     # LaunchAgents 디렉토리 생성 및 plist 작성
     run_remote(ssh, f"mkdir -p {agents_dir}")
@@ -452,7 +570,8 @@ def deploy_macos(ssh, sftp, service_name: str, project_name: str,
         f'    <string>{svc_label}</string>\n'
         f'    <key>ProgramArguments</key>\n'
         f'    <array>\n'
-        f'        <string>{remote_dir}/{exe}</string>\n'
+        f'        <string>/bin/bash</string>\n'
+        f'        <string>{wrapper_path}</string>\n'
         f'    </array>\n'
         f'    <key>WorkingDirectory</key>\n'
         f'    <string>{remote_dir}</string>\n'
@@ -470,7 +589,13 @@ def deploy_macos(ssh, sftp, service_name: str, project_name: str,
     with sftp.open(plist_path, "w") as f:
         f.write(plist)
 
-    run_remote(ssh, f"launchctl load {plist_path}")
+    # bootstrap 우선, 실패 시 load 폴백
+    if uid:
+        code, _, _ = run_remote(ssh, f"launchctl bootstrap gui/{uid} {plist_path}", ignore_error=True)
+        if code != 0:
+            run_remote(ssh, f"launchctl load {plist_path}")
+    else:
+        run_remote(ssh, f"launchctl load {plist_path}")
 
     print(f"  [완료] launchd 에이전트 등록 완료")
     print(f"  상태 확인: launchctl list | grep battleship")
@@ -479,10 +604,14 @@ def deploy_macos(ssh, sftp, service_name: str, project_name: str,
 def deploy_windows(ssh, sftp, service_name: str, project_name: str,
                    local_dir: Path, remote_base: str,
                    username: str, password: str):
-    remote_dir_sftp = f"{remote_base}/{service_name.lower()}".replace("\\", "/")
-    remote_dir_win  = f"{remote_base}\\{service_name.lower()}"
+    remote_dir_sftp  = f"{remote_base}/{service_name.lower()}".replace("\\", "/")
+    remote_dir_win   = f"{remote_base}\\{service_name.lower()}"
+    remote_base_sftp = remote_base.replace("\\", "/")
     exe      = f"{project_name}.exe"
     svc_name = f"BattleShip{service_name}"
+    ps1_name = f"run_{service_name.lower()}.ps1"
+    ps1_sftp = f"{remote_base_sftp}/{ps1_name}"
+    ps1_win  = f"{remote_base}\\{ps1_name}"
 
     print(f"\n[배포] {service_name} → {remote_dir_win}")
 
@@ -493,10 +622,25 @@ def deploy_windows(ssh, sftp, service_name: str, project_name: str,
     # 파일 업로드
     upload_directory(sftp, local_dir, remote_dir_sftp)
 
-    # Windows Service 등록 및 시작
+    # PowerShell 래퍼 스크립트 생성 (.env 로드 후 실행)
+    ps1 = (
+        f"$envFile = \"{remote_base}\\.env\"\r\n"
+        "if (Test-Path $envFile) {\r\n"
+        "    Get-Content $envFile | Where-Object { $_ -match '^[^#].+=.+' } | ForEach-Object {\r\n"
+        "        $key, $val = $_ -split '=', 2\r\n"
+        "        [System.Environment]::SetEnvironmentVariable($key.Trim(), $val.Trim(), 'Process')\r\n"
+        "    }\r\n"
+        "}\r\n"
+        f"& \"{remote_dir_win}\\{exe}\"\r\n"
+    )
+    with sftp.open(ps1_sftp, "w") as f:
+        f.write(ps1)
+
+    # Windows Service 등록 및 시작 (PowerShell 래퍼를 binPath로 사용)
+    bin_path = f"powershell.exe -ExecutionPolicy Bypass -NoProfile -File \"{ps1_win}\""
     run_remote(ssh,
         f'sc create {svc_name} '
-        f'binPath= "{remote_dir_win}\\{exe}" '
+        f'binPath= "{bin_path}" '
         f'start= auto '
         f'DisplayName= "BattleShip {service_name}"')
     run_remote(ssh, f'sc description {svc_name} "BattleShip {service_name} Server"')
@@ -665,6 +809,10 @@ def main():
     default_path = DEFAULT_DEPLOY_PATHS[runtime]
     remote_base  = prompt(f"\n원격 배포 경로", default=default_path)
 
+    # ── 7. 환경변수 설정 ───────────────────────────────────────
+    exe_default = GAME_SESSION_EXE_DEFAULTS.get(runtime, "")
+    env_config = load_env_config(exe_default)
+
     # ── 요약 확인 ─────────────────────────────────────────────
     print("\n" + "=" * 58)
     print("  배포 요약")
@@ -710,6 +858,9 @@ def main():
             _, home, _ = run_remote(ssh, "echo $HOME")
             remote_base = remote_base.replace("~", home.strip())
             print(f"  배포 경로 확정: {remote_base}")
+
+        # 환경변수 파일 업로드 (.env)
+        upload_env(ssh, sftp, remote_base, env_config, runtime)
 
         # 의존성(Redis, MySQL) 확인 및 설치
         check_and_install_deps(ssh, runtime, password)

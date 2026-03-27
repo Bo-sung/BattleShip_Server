@@ -7,6 +7,17 @@ class Program
     {
         Console.OutputEncoding = System.Text.Encoding.UTF8;
 
+        // .env 파일 로드 (현재 디렉토리 → 상위 디렉토리 순으로 탐색)
+        var envFile = File.Exists(".env") ? ".env" : File.Exists("../.env") ? "../.env" : null;
+        if (envFile != null)
+            foreach (var line in File.ReadLines(envFile))
+            {
+                if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#")) continue;
+                var idx = line.IndexOf('=');
+                if (idx < 0) continue;
+                Environment.SetEnvironmentVariable(line[..idx].Trim(), line[(idx + 1)..].Trim());
+            }
+
         var argMap = ParseArgs(args);
 
         string sessionId = argMap.GetValueOrDefault("--session", "test-session");

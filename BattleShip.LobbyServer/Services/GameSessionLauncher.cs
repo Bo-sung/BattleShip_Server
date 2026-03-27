@@ -46,8 +46,10 @@ namespace BattleShip.LobbyServer.Services
             {
                 FileName = _exePath,
                 Arguments = $"--session {sessionId} --port {port} --lobby-host 127.0.0.1 --lobby-port 8002",
-                UseShellExecute = true,
-                CreateNoWindow = false,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = false,
+                RedirectStandardError = false,
             };
 
             var process = Process.Start(psi)

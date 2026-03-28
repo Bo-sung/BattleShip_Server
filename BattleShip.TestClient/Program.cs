@@ -125,7 +125,7 @@ class Program
                 Console.WriteLine("방 없음\n");
             else
                 foreach (var r in rooms)
-                    Console.WriteLine($"  [{r.RoomId}] {r.RoomName} ({r.PlayerCount}/2)");
+                    Console.WriteLine($"  [{r.RoomId}] {r.RoomName} [{r.ConfigName}] ({r.PlayerCount}/2)");
             Console.WriteLine();
         }
     }
@@ -135,7 +135,14 @@ class Program
         Console.Write("방 이름: ");
         string roomName = Console.ReadLine()!;
 
-        if (await gameClient.CreateRoomAsync(roomName) != null)
+        Console.WriteLine("게임 모드 선택:");
+        Console.WriteLine("  1. classic  (10x10, 5종 함선)");
+        Console.WriteLine("  2. extended (12x12, 6종 함선)");
+        Console.Write("선택 [1]: ");
+        string modeInput = Console.ReadLine()!.Trim();
+        string configName = modeInput == "2" ? "extended" : "classic";
+
+        if (await gameClient.CreateRoomAsync(roomName, configName) != null)
         {
             var (success, gs) = await gameClient.WaitForGameStartAsHostAsync();
             if (success && gs != null)

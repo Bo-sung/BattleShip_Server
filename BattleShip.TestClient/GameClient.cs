@@ -103,11 +103,11 @@ public class GameClient : IAsyncDisposable
         }
     }
 
-    public async Task<string?> CreateRoomAsync(string roomName)
+    public async Task<string?> CreateRoomAsync(string roomName, string configName = "classic")
     {
         try
         {
-            await SendAsync(_lobbyStream!, new C_RoomCreateReq { RoomName = roomName });
+            await SendAsync(_lobbyStream!, new C_RoomCreateReq { RoomName = roomName, ConfigName = configName });
             var res = await ReceiveAsync(_lobbyStream!, _lobbyRecvBuf);
 
             if (res is S_RoomCreateRes { Success: true } create)

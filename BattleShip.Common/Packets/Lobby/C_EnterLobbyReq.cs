@@ -25,6 +25,7 @@ namespace BattleShip.Common.Packets.Lobby
         public string RoomName { get; set; }
         public string HostUsername { get; set; }
         public byte PlayerCount { get; set; }
+        public string ConfigName { get; set; } = "classic";
 
         public void Serialize(PacketWriter writer)
         {
@@ -32,6 +33,7 @@ namespace BattleShip.Common.Packets.Lobby
             writer.Write(RoomName);
             writer.Write(HostUsername);
             writer.Write(PlayerCount);
+            writer.Write(ConfigName);
         }
 
         public static RoomInfo Deserialize(PacketReader reader)
@@ -42,6 +44,7 @@ namespace BattleShip.Common.Packets.Lobby
                 RoomName = reader.ReadString(),
                 HostUsername = reader.ReadString(),
                 PlayerCount = reader.ReadByte(),
+                ConfigName = reader.ReadString(),
             };
         }
     }

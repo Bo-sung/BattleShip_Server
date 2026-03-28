@@ -108,7 +108,7 @@ namespace BattleShip.LobbyServer.Sessions
                     return;
                 }
 
-                string roomId = _roomMgr.CreateRoom(req.RoomName, this);
+                string roomId = _roomMgr.CreateRoom(req.RoomName, this, req.ConfigName);
                 RoomId = roomId;
 
                 await SendAsync(new S_RoomCreateRes
@@ -202,7 +202,7 @@ namespace BattleShip.LobbyServer.Sessions
                 }
 
                 // GameSession spawn
-                var sessionInfo = _launcher.Launch(RoomId);
+                var sessionInfo = _launcher.Launch(RoomId, room.ConfigName);
                 _registry.Add(sessionInfo);
 
                 Console.WriteLine($"[Lobby] 세션 생성: {sessionInfo.SessionId} — 포트 {sessionInfo.Port}");

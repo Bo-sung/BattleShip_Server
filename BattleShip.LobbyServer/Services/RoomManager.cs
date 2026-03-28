@@ -8,6 +8,7 @@ namespace BattleShip.LobbyServer.Services
     {
         public string RoomId { get; set; }
         public string RoomName { get; set; }
+        public string ConfigName { get; set; } = "classic";
         public LobbyClientSession Player1 { get; set; }  // 방장
         public LobbyClientSession Player2 { get; set; }  // 참가자
         public bool IsStarting { get; set; }
@@ -34,7 +35,7 @@ namespace BattleShip.LobbyServer.Services
             _redis = redis;
         }
 
-        public string CreateRoom(string roomName, LobbyClientSession host)
+        public string CreateRoom(string roomName, LobbyClientSession host, string configName = "classic")
         {
             string roomId = Guid.NewGuid().ToString("N")[..8];
 
@@ -42,6 +43,7 @@ namespace BattleShip.LobbyServer.Services
             {
                 RoomId = roomId,
                 RoomName = roomName,
+                ConfigName = configName,
                 Player1 = host
             };
 
@@ -113,7 +115,8 @@ namespace BattleShip.LobbyServer.Services
                     RoomId = r.RoomId,
                     RoomName = r.RoomName,
                     HostUsername = r.Player1.Username,
-                    PlayerCount = (byte)(r.IsFull ? 2 : 1)
+                    PlayerCount = (byte)(r.IsFull ? 2 : 1),
+                    ConfigName = r.ConfigName
                 }).ToList();
             }
         }

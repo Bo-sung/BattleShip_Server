@@ -1,0 +1,11 @@
+{
+  "boardSize": 12,
+  "ships": [
+    { "type": 0, "name": "항공모함", "size": 5 },
+    { "type": 1, "name": "전함", "size": 4 },
+    { "type": 2, "name": "순양함", "size": 3 },
+    { "type": 3, "name": "잠수함", "size": 3 },
+    { "type": 4, "name": "호위함", "size": 3 },
+    { "type": 5, "name": "구축함", "size": 2 }
+  ]
+}

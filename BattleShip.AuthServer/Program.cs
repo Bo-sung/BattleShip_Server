@@ -9,8 +9,13 @@ class Program
     {
         Console.OutputEncoding = System.Text.Encoding.UTF8;
 
-        // .env 파일 로드 (현재 디렉토리 → 상위 디렉토리 순으로 탐색)
-        var envFile = File.Exists(".env") ? ".env" : File.Exists("../.env") ? "../.env" : null;
+        // .env 파일 로드 (.env > deploy.env 우선순위)
+        string envFile = null;
+        if (File.Exists(".env")) envFile = ".env";
+        else if (File.Exists("deploy.env")) envFile = "deploy.env";
+        else if (File.Exists("../.env")) envFile = "../.env";
+        else if (File.Exists("../deploy.env")) envFile = "../deploy.env";
+
         if (envFile != null)
             foreach (var line in File.ReadLines(envFile))
             {
@@ -27,7 +32,9 @@ class Program
         string lobbyHost = Environment.GetEnvironmentVariable("LOBBY_HOST") ?? "127.0.0.1";
         int lobbyPort = int.Parse(Environment.GetEnvironmentVariable("LOBBY_PORT") ?? "7002");
 
-        var redis = await ConnectionMultiplexer.ConnectAsync(redisConnection);
+        var options = ConfigurationOptions.Parse(redisConnection);
+        options.AbortOnConnectFail = false;
+        var redis = await ConnectionMultiplexer.ConnectAsync(options);
         var userRepo = new UserRepository(dbConnection);
         var tokenSvc = new TokenService(redis.GetDatabase());
 

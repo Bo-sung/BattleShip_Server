@@ -11,8 +11,13 @@ class Program
     {
         Console.OutputEncoding = System.Text.Encoding.UTF8;
 
-        // .env 파일 로드 (현재 디렉토리 → 상위 디렉토리 순으로 탐색)
-        var envFile = File.Exists(".env") ? ".env" : File.Exists("../.env") ? "../.env" : null;
+        // .env 파일 로드 (.env > deploy.env 우선순위)
+        string envFile = null;
+        if (File.Exists(".env")) envFile = ".env";
+        else if (File.Exists("deploy.env")) envFile = "deploy.env";
+        else if (File.Exists("../.env")) envFile = "../.env";
+        else if (File.Exists("../deploy.env")) envFile = "../deploy.env";
+
         if (envFile != null)
             foreach (var line in File.ReadLines(envFile))
             {
@@ -34,7 +39,9 @@ class Program
 
         var configs = LoadConfigs(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "configs"));
 
-        var redis = await ConnectionMultiplexer.ConnectAsync(redisConnection);
+        var options = ConfigurationOptions.Parse(redisConnection);
+        options.AbortOnConnectFail = false;
+        var redis = await ConnectionMultiplexer.ConnectAsync(options);
         var redisDb = redis.GetDatabase();
         var roomMgr = new RoomManager(redisDb);
         var gameRecord = new GameRecordRepository(dbConnection);
@@ -88,7 +95,8 @@ class Program
 
         var config = new GameRuleConfig
         {
-            BoardSize = root.GetProperty("boardSize").GetInt32()
+            BoardSize = root.GetProperty("boardSize").GetInt32(),
+            GameMode = root.TryGetProperty("gameMode", out var gmProp) ? gmProp.GetByte() : (byte)0
         };
 
         foreach (var ship in root.GetProperty("ships").EnumerateArray())
@@ -99,6 +107,20 @@ class Program
                 Name = ship.GetProperty("name").GetString()!,
                 Size = ship.GetProperty("size").GetInt32(),
             });
+        }
+
+        if (root.TryGetProperty("skillPool", out var skillProp))
+        {
+            foreach (var skill in skillProp.EnumerateArray())
+            {
+                config.SkillPool.Add(new SkillDefinition
+                {
+                    Type = skill.GetProperty("type").GetByte(),
+                    Name = skill.GetProperty("name").GetString()!,
+                    ManaCost = skill.GetProperty("manaCost").GetByte(),
+                    Description = skill.GetProperty("description").GetString()!
+                });
+            }
         }
 
         return config;

@@ -77,6 +77,20 @@ namespace BattleShip.Common.Network
                 PacketId.S_GameOver => new S_GameOver(),
                 PacketId.S_GameRuleConfig => new S_GameRuleConfig(),
 
+                // StarBattle (3012~3025)
+                PacketId.C_SelectSkillsReq => new C_SelectSkillsReq(),
+                PacketId.S_SelectSkillsRes => new S_SelectSkillsRes(),
+                PacketId.S_BothSkillsSelected => new S_BothSkillsSelected(),
+                PacketId.C_MoveReq => new C_MoveReq(),
+                PacketId.S_MoveRes => new S_MoveRes(),
+                PacketId.C_SkillReq => new C_SkillReq(),
+                PacketId.S_SkillAttackRes => new S_SkillAttackRes(),
+                PacketId.S_OpponentSkillAttack => new S_OpponentSkillAttack(),
+                PacketId.S_SkillMoveRes => new S_SkillMoveRes(),
+                PacketId.S_SkillRepairRes => new S_SkillRepairRes(),
+                PacketId.S_OpponentRepaired => new S_OpponentRepaired(),
+                PacketId.S_SkillShieldRes => new S_SkillShieldRes(),
+
                 // 서버 간
                 PacketId.SS_Ping => new SS_Ping(),
                 PacketId.SS_Pong => new SS_Pong(),

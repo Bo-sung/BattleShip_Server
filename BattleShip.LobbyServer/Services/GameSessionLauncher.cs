@@ -1,4 +1,4 @@
-using BattleShip.Common.Packets.Lobby;
+﻿using BattleShip.Common.Packets.Lobby;
 using BattleShip.LobbyServer.Sessions;
 using System.Diagnostics;
 
@@ -47,7 +47,11 @@ namespace BattleShip.LobbyServer.Services
                 FileName = _exePath,
                 Arguments = $"--session {sessionId} --port {port} --lobby-host 127.0.0.1 --lobby-port 8002",
                 UseShellExecute = false,
-                CreateNoWindow = true,
+#if DEBUG
+                CreateNoWindow = false,  // 개발 중: 콘솔창 표시
+#else
+                CreateNoWindow = true,   // 배포 시: 콘솔창 숨김
+#endif
                 RedirectStandardOutput = false,
                 RedirectStandardError = false,
             };

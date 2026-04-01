@@ -53,7 +53,7 @@ ENV_FILE = SCRIPT_DIR / "deploy.env"
 # (환경변수 키, 설명, 기본값)
 ENV_VARS = [
     ("DB_CONNECTION",          "MySQL 연결 문자열",          "Server=localhost;Database=battleship;User=root;Password="),
-    ("REDIS_CONNECTION",       "Redis 연결 문자열",          "localhost:6379"),
+    ("REDIS_CONNECTION",       "Redis 연결 문자열 (password 포함)",          "localhost:6379,password="),
     ("LOBBY_HOST",             "LobbyServer 호스트 (클라이언트가 접속할 주소)", "127.0.0.1"),
     ("LOBBY_PORT",             "LobbyServer 포트",           "7002"),
     ("GAME_SESSION_HOST",      "GameSession 호스트 (클라이언트가 접속할 주소)", "127.0.0.1"),

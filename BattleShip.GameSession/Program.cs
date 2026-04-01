@@ -68,7 +68,8 @@ class Program
 
         var config = new GameRuleConfig
         {
-            BoardSize = root.GetProperty("boardSize").GetInt32()
+            BoardSize = root.GetProperty("boardSize").GetInt32(),
+            GameMode = root.TryGetProperty("gameMode", out var gmProp) ? gmProp.GetByte() : (byte)0
         };
 
         foreach (var ship in root.GetProperty("ships").EnumerateArray())
@@ -79,6 +80,20 @@ class Program
                 Name = ship.GetProperty("name").GetString()!,
                 Size = ship.GetProperty("size").GetInt32(),
             });
+        }
+
+        if (root.TryGetProperty("skillPool", out var skillProp))
+        {
+            foreach (var skill in skillProp.EnumerateArray())
+            {
+                config.SkillPool.Add(new SkillDefinition
+                {
+                    Type = skill.GetProperty("type").GetByte(),
+                    Name = skill.GetProperty("name").GetString()!,
+                    ManaCost = skill.GetProperty("manaCost").GetByte(),
+                    Description = skill.GetProperty("description").GetString()!
+                });
+            }
         }
 
         return config;

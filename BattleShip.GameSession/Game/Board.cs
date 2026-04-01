@@ -11,6 +11,9 @@ namespace BattleShip.GameSession.Game
         private readonly bool[,] _hits;
         private readonly Ship?[,] _shipAt;
         private readonly List<Ship> _shipList = new List<Ship>();
+        private readonly Dictionary<byte, List<(byte x, byte y)>> _shipCells = new();  // Track ship positions
+
+        public int BoardSize => _boardSize;
 
         public Board(GameRuleConfig config)
         {
@@ -59,6 +62,7 @@ namespace BattleShip.GameSession.Game
             {
                 var ship = Ship.Create(_shipDefs[p.ShipType]);
                 _shipList.Add(ship);
+                var cells = new List<(byte, byte)>();
 
                 for (int i = 0; i < ship.Size; i++)
                 {
@@ -67,7 +71,10 @@ namespace BattleShip.GameSession.Game
 
                     _ships[x, y] = true;
                     _shipAt[x, y] = ship;
+                    cells.Add(((byte)x, (byte)y));
                 }
+
+                _shipCells[p.ShipType] = cells;
             }
 
             return true;
@@ -95,5 +102,66 @@ namespace BattleShip.GameSession.Game
         public bool IsAlreadyAttacked(byte x, byte y) => _hits[x, y];
 
         public bool IsAllSunk() => _shipList.All(s => s.IsSunk);
+
+        public (Ship? ship, List<(byte x, byte y)> cells) GetShipAt(byte x, byte y)
+        {
+            if (x < 0 || x >= _boardSize || y < 0 || y >= _boardSize)
+                return (null, new List<(byte, byte)>());
+
+            var ship = _shipAt[x, y];
+            if (ship == null)
+                return (null, new List<(byte, byte)>());
+
+            var shipType = ship.Type;
+            var cells = _shipCells.ContainsKey(shipType) ? _shipCells[shipType] : new List<(byte, byte)>();
+            return (ship, cells);
+        }
+
+        public (Ship? ship, List<(byte x, byte y)> cells) GetShipWithCells(byte shipType)
+        {
+            var ship = _shipList.FirstOrDefault(s => s.Type == shipType);
+            var cells = _shipCells.ContainsKey(shipType) ? _shipCells[shipType] : new List<(byte, byte)>();
+            return (ship, cells);
+        }
+
+        public bool CanPlaceShip(List<(byte x, byte y)> cells)
+        {
+            // Check bounds and overlaps
+            foreach (var (x, y) in cells)
+            {
+                if (x < 0 || x >= _boardSize || y < 0 || y >= _boardSize)
+                    return false;
+
+                if (_ships[x, y])
+                    return false;
+            }
+
+            return true;
+        }
+
+        public void MoveShip(byte shipType, List<(byte x, byte y)> newCells)
+        {
+            // Clear old cells
+            if (_shipCells.ContainsKey(shipType))
+            {
+                foreach (var (x, y) in _shipCells[shipType])
+                {
+                    _ships[x, y] = false;
+                    _shipAt[x, y] = null;
+                }
+            }
+
+            // Place at new cells
+            var ship = _shipList.FirstOrDefault(s => s.Type == shipType);
+            if (ship != null)
+            {
+                foreach (var (x, y) in newCells)
+                {
+                    _ships[x, y] = true;
+                    _shipAt[x, y] = ship;
+                }
+                _shipCells[shipType] = newCells;
+            }
+        }
     }
 }

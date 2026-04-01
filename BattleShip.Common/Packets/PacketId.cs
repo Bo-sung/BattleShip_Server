@@ -34,6 +34,20 @@
         S_GameOver = 3010,
         S_GameRuleConfig = 3011,
 
+        // StarBattle (3012~3025)
+        C_SelectSkillsReq = 3012,
+        S_SelectSkillsRes = 3013,
+        S_BothSkillsSelected = 3014,
+        C_MoveReq = 3015,
+        S_MoveRes = 3016,
+        C_SkillReq = 3018,
+        S_SkillAttackRes = 3019,
+        S_OpponentSkillAttack = 3020,
+        S_SkillMoveRes = 3021,
+        S_SkillRepairRes = 3023,
+        S_OpponentRepaired = 3024,
+        S_SkillShieldRes = 3025,
+
         // 서버 간 (9xxx)
         SS_Ping = 9001,
         SS_Pong = 9002,

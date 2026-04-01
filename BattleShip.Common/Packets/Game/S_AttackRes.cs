@@ -8,7 +8,7 @@ namespace BattleShip.Common.Packets.Game
 
         public byte X { get; set; }
         public byte Y { get; set; }
-        public byte Result { get; set; }  // 0=Miss, 1=Hit, 2=Sunk
+        public byte Result { get; set; }  // 0=Miss, 1=Hit, 2=Sunk, 3=AlreadyAttacked, 4=ShieldBlocked
         public string SunkShipName { get; set; }  // Sunk일 때만 유효, 나머지는 빈 문자열
 
         public void Serialize(PacketWriter writer)

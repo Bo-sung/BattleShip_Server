@@ -1,15 +1,13 @@
-﻿using BattleShip.Common.Network;
+using BattleShip.Common.Network;
 
 namespace BattleShip.Common.Packets.Game
 {
-    public class S_OpponentAttack : IPacket
+    public class CellResult
     {
-        public PacketId PacketId => PacketId.S_OpponentAttack;
-
         public byte X { get; set; }
         public byte Y { get; set; }
         public byte Result { get; set; }  // 0=Miss, 1=Hit, 2=Sunk, 3=AlreadyAttacked, 4=ShieldBlocked
-        public string SunkShipName { get; set; }
+        public string SunkShipName { get; set; } = "";
 
         public void Serialize(PacketWriter writer)
         {
@@ -19,12 +17,15 @@ namespace BattleShip.Common.Packets.Game
             writer.Write(SunkShipName);
         }
 
-        public void Deserialize(PacketReader reader)
+        public static CellResult Deserialize(PacketReader reader)
         {
-            X = reader.ReadByte();
-            Y = reader.ReadByte();
-            Result = reader.ReadByte();
-            SunkShipName = reader.ReadString();
+            return new CellResult
+            {
+                X = reader.ReadByte(),
+                Y = reader.ReadByte(),
+                Result = reader.ReadByte(),
+                SunkShipName = reader.ReadString(),
+            };
         }
     }
 }

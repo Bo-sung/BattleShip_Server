@@ -329,6 +329,107 @@ public class GameClient : IAsyncDisposable
         return await ReceiveAsync(_gameStream!, _gameRecvBuf);
     }
 
+    public async Task<(bool success, List<SkillDefinition> skills)> WaitForSkillSelectionAsync()
+    {
+        try
+        {
+            var rulePacket = await ReceiveAsync(_gameStream!, _gameRecvBuf);
+            if (rulePacket is S_GameRuleConfig rc)
+            {
+                return (true, rc.Config.SkillPool);
+            }
+            return (false, new List<SkillDefinition>());
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"스킬 풀 수신 오류: {ex.Message}");
+            return (false, new List<SkillDefinition>());
+        }
+    }
+
+    public async Task<bool> SelectSkillsAsync(byte skill1, byte skill2)
+    {
+        try
+        {
+            await SendAsync(_gameStream!, new C_SelectSkillsReq { Skill1 = skill1, Skill2 = skill2 });
+            var res = await ReceiveAsync(_gameStream!, _gameRecvBuf);
+
+            if (res is S_SelectSkillsRes { Success: true })
+            {
+                Console.WriteLine("스킬 선택 완료. 상대방 선택 대기 중...");
+                return true;
+            }
+
+            Console.WriteLine("스킬 선택 실패");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"스킬 선택 오류: {ex.Message}");
+            return false;
+        }
+    }
+
+    public async Task<bool> WaitForBothSkillsSelectedAsync()
+    {
+        try
+        {
+            var pkt = await ReceiveAsync(_gameStream!, _gameRecvBuf);
+            if (pkt is S_BothSkillsSelected)
+            {
+                Console.WriteLine("양쪽 스킬 선택 완료!");
+                var turnNotify = await ReceiveAsync(_gameStream!, _gameRecvBuf);
+                bool isMyTurn = (turnNotify as S_TurnNotify)?.IsMyTurn ?? false;
+                Console.WriteLine(isMyTurn ? "\n내 차례로 시작!" : "\n상대방이 먼저 시작합니다.");
+                return true;
+            }
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"스킬 선택 완료 대기 오류: {ex.Message}");
+            return false;
+        }
+    }
+
+    public async Task<(bool success, S_MoveRes?)> MoveAsync(byte shipType, sbyte dirX, sbyte dirY)
+    {
+        try
+        {
+            await SendAsync(_gameStream!, new C_MoveReq { ShipType = shipType, DirX = dirX, DirY = dirY });
+            var res = await ReceiveAsync(_gameStream!, _gameRecvBuf);
+
+            if (res is S_MoveRes mr)
+                return (true, mr);
+
+            return (false, null);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"이동 오류: {ex.Message}");
+            return (false, null);
+        }
+    }
+
+    public async Task<(bool success, IPacket?)> UseSkillAsync(byte skillType, byte targetX, byte targetY, byte shipType)
+    {
+        try
+        {
+            await SendAsync(_gameStream!, new C_SkillReq { SkillType = skillType, TargetX = targetX, TargetY = targetY, ShipType = shipType });
+            var res = await ReceiveAsync(_gameStream!, _gameRecvBuf);
+
+            if (res is S_SkillAttackRes or S_SkillShieldRes or S_SkillRepairRes or S_SkillMoveRes)
+                return (true, res);
+
+            return (false, null);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"스킬 사용 오류: {ex.Message}");
+            return (false, null);
+        }
+    }
+
     private async Task SendAsync(NetworkStream stream, IPacket packet)
     {
         byte[] data = PacketSerializer.Serialize(packet);

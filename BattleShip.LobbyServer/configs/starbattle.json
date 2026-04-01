@@ -1,0 +1,20 @@
+{
+  "boardSize": 12,
+  "gameMode": 2,
+  "ships": [
+    { "type": 0, "name": "항공모함", "size": 5 },
+    { "type": 1, "name": "전함", "size": 4 },
+    { "type": 2, "name": "순양함", "size": 3 },
+    { "type": 3, "name": "잠수함", "size": 3 },
+    { "type": 4, "name": "호위함", "size": 3 },
+    { "type": 5, "name": "구축함", "size": 2 }
+  ],
+  "skillPool": [
+    { "type": 1, "name": "범위공격", "manaCost": 3, "description": "3x3 범위 공격" },
+    { "type": 2, "name": "쉴드", "manaCost": 2, "description": "2턴간 보호" },
+    { "type": 3, "name": "수리", "manaCost": 1, "description": "함선 1칸 수리" },
+    { "type": 4, "name": "이동", "manaCost": 1, "description": "함선 이동" },
+    { "type": 5, "name": "동결", "manaCost": 2, "description": "3턴간 영역 동결" },
+    { "type": 6, "name": "회복", "manaCost": 1, "description": "마나 3 회복" }
+  ]
+}

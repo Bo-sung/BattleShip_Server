@@ -366,6 +366,197 @@ namespace BattleShip.GameSession
             }
         }
 
+        public async Task OnSelectSkills(int playerIndex, C_SelectSkillsReq req)
+        {
+            if (_gameState.Phase != GamePhase.SkillSelection)
+                return;
+
+            _gameState.SetSkillsSelected(playerIndex, req.Skill1, req.Skill2);
+
+            var session = GetPlayer(playerIndex);
+            await session.SendAsync(new S_SelectSkillsRes { Success = true });
+
+            if (_gameState.AreAllSkillsSelected())
+            {
+                Console.WriteLine($"[Session:{_sessionId}] 스킬 선택 완료 — 선공: Player {_gameState.CurrentTurn}");
+                _gameState.StartGameFromSkillSelection();
+
+                await BroadcastAsync(new S_BothSkillsSelected());
+
+                await _player1!.SendAsync(new S_TurnNotify
+                {
+                    IsMyTurn = _gameState.CurrentTurn == 0,
+                    Mana = _gameState.GetMana(0)
+                });
+                await _player2!.SendAsync(new S_TurnNotify
+                {
+                    IsMyTurn = _gameState.CurrentTurn == 1,
+                    Mana = _gameState.GetMana(1)
+                });
+            }
+        }
+
+        public async Task OnMove(int playerIndex, C_MoveReq req)
+        {
+            if (!_gameState.IsMyTurn(playerIndex))
+                return;
+
+            if (_gameState.Phase != GamePhase.InProgress)
+                return;
+
+            var (success, message) = _gameState.ProcessMove(playerIndex, req.ShipType, req.DirX, req.DirY);
+
+            var session = GetPlayer(playerIndex);
+            await session.SendAsync(new S_MoveRes
+            {
+                Success = success,
+                Message = message
+            });
+
+            if (success)
+            {
+                _turnCount++;
+                // Move consumes a turn - turn switch handled by ProcessMove (which calls ProcessAttack path)
+
+                await _player1!.SendAsync(new S_TurnNotify
+                {
+                    IsMyTurn = _gameState.CurrentTurn == 0,
+                    Mana = _gameState.GetMana(0)
+                });
+                await _player2!.SendAsync(new S_TurnNotify
+                {
+                    IsMyTurn = _gameState.CurrentTurn == 1,
+                    Mana = _gameState.GetMana(1)
+                });
+            }
+        }
+
+        public async Task OnSkill(int playerIndex, C_SkillReq req)
+        {
+            if (!_gameState.IsMyTurn(playerIndex))
+                return;
+
+            if (_gameState.Phase != GamePhase.InProgress)
+                return;
+
+            _turnCount++;
+
+            var (skillType, results, success) = _gameState.ProcessSkill(playerIndex, req.SkillType, req.TargetX, req.TargetY, req.ShipType);
+
+            var attacker = GetPlayer(playerIndex);
+            var defender = GetPlayer(1 - playerIndex);
+
+            // Send appropriate response based on skill type
+            switch (skillType)
+            {
+                case 1:  // Range Attack
+                    await attacker.SendAsync(new S_SkillAttackRes
+                    {
+                        SkillType = 1,
+                        Cells = results.Select(r => new CellResult
+                        {
+                            X = r.x,
+                            Y = r.y,
+                            Result = r.result,
+                            SunkShipName = r.sunkShipName
+                        }).ToList(),
+                        Mana = _gameState.GetMana(playerIndex)
+                    });
+
+                    if (success)
+                    {
+                        await defender.SendAsync(new S_OpponentSkillAttack
+                        {
+                            SkillType = 1,
+                            Cells = results.Select(r => new CellResult
+                            {
+                                X = r.x,
+                                Y = r.y,
+                                Result = r.result,
+                                SunkShipName = r.sunkShipName
+                            }).ToList()
+                        });
+                    }
+                    break;
+
+                case 2:  // Shield
+                    await attacker.SendAsync(new S_SkillShieldRes
+                    {
+                        Success = success,
+                        ShipType = req.ShipType,
+                        Duration = 2,
+                        Mana = _gameState.GetMana(playerIndex)
+                    });
+                    break;
+
+                case 3:  // Repair
+                    await attacker.SendAsync(new S_SkillRepairRes
+                    {
+                        Success = success,
+                        ShipType = req.ShipType,
+                        Mana = _gameState.GetMana(playerIndex)
+                    });
+
+                    if (success)
+                    {
+                        await defender.SendAsync(new S_OpponentRepaired
+                        {
+                            ShipType = req.ShipType
+                        });
+                    }
+                    break;
+
+                case 4:  // Movement skill
+                    await attacker.SendAsync(new S_SkillMoveRes
+                    {
+                        Success = success,
+                        Message = "",
+                        Mana = _gameState.GetMana(playerIndex)
+                    });
+                    break;
+
+                case 5:  // Freeze
+                    await attacker.SendAsync(new S_SkillAttackRes
+                    {
+                        SkillType = 5,
+                        Cells = new List<CellResult>(),
+                        Mana = _gameState.GetMana(playerIndex)
+                    });
+                    break;
+
+                case 6:  // Recovery
+                    await attacker.SendAsync(new S_SkillAttackRes
+                    {
+                        SkillType = 6,
+                        Cells = new List<CellResult>(),
+                        Mana = _gameState.GetMana(playerIndex)
+                    });
+                    break;
+            }
+
+            if (success)
+            {
+                bool isGameOver = _gameState.Boards[1 - playerIndex].IsAllSunk();
+
+                if (isGameOver)
+                {
+                    await FinishGameAsync(winnerId: playerIndex.ToString(), loserId: (1 - playerIndex).ToString(), reason: 0);
+                    return;
+                }
+
+                await _player1!.SendAsync(new S_TurnNotify
+                {
+                    IsMyTurn = _gameState.CurrentTurn == 0,
+                    Mana = _gameState.GetMana(0)
+                });
+                await _player2!.SendAsync(new S_TurnNotify
+                {
+                    IsMyTurn = _gameState.CurrentTurn == 1,
+                    Mana = _gameState.GetMana(1)
+                });
+            }
+        }
+
         public async Task OnAttack(int playerIndex, C_AttackReq req)
         {
             if (!_gameState.IsMyTurn(playerIndex))
